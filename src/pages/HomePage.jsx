@@ -4,7 +4,7 @@ import {
   ArrowRight, Truck, Shield, RotateCcw, Headphones,
   Wrench, Zap, CircleDot, Wind, Droplets, Gauge, Star,
   ChevronLeft, ChevronRight, CheckCircle, Tag,
-  Package, Clock, ThumbsUp, Award,
+  Package, Clock, ThumbsUp, Award, Tractor,
 } from "lucide-react";
 import ProductCard from "../components/ProductCard";
 import { useProducts } from "../hooks/useProducts";
@@ -55,6 +55,8 @@ const CATEGORY_ICON_MAP = {
   "lubricants":   Droplets,
   "suspension":   Wind,
   "accessories":  Star,
+  "agriculture":  Tractor,
+  "farming":      Tractor,
 };
 
 function getCatIcon(name = "") {
@@ -94,8 +96,11 @@ export default function HomePage({ auth, cartHook, wishlistHook }) {
   useEffect(() => {
     api.get("/categories?nav=true")
       .then(({ data }) => {
-        if (Array.isArray(data))
-          setCategories([...data].sort((a, b) => (a.navOrder ?? 99) - (b.navOrder ?? 99)));
+        if (Array.isArray(data)) {
+          const hasAgri = data.some(c => c.slug?.toLowerCase() === "agriculture");
+          const merged = hasAgri ? data : [...data, { name: "Agriculture", slug: "agriculture", navOrder: 7 }];
+          setCategories([...merged].sort((a, b) => (a.navOrder ?? 99) - (b.navOrder ?? 99)));
+        }
       })
       .catch(() => {});
   }, []);
@@ -239,15 +244,20 @@ export default function HomePage({ auth, cartHook, wishlistHook }) {
           <div className="grid grid-cols-4 md:grid-cols-8 gap-3">
             {categories.map(({ name, slug }) => {
               const Icon = getCatIcon(name);
+              const isAgri = slug?.toLowerCase() === "agriculture";
               return (
                 <button
                   key={slug}
                   onClick={() => navigate(`/products/category/${slug}`)}
                   className="flex flex-col items-center gap-2 group"
                 >
-                  <div className="w-14 h-14 md:w-16 md:h-16 bg-[#0a1f44] rounded-2xl flex items-center
-                                  justify-center shadow-sm group-hover:bg-[#0d2657] group-hover:scale-105
-                                  group-hover:shadow-md transition-all duration-200">
+                  <div className={`w-14 h-14 md:w-16 md:h-16 rounded-2xl flex items-center
+                                  justify-center shadow-sm group-hover:scale-105
+                                  group-hover:shadow-md transition-all duration-200 ${
+                                    isAgri
+                                      ? "bg-[#15803d] group-hover:bg-[#166534]"
+                                      : "bg-[#0a1f44] group-hover:bg-[#0d2657]"
+                                  }`}>
                     <Icon className="w-6 h-6 md:w-7 md:h-7 text-white" />
                   </div>
                   <span className="text-xs font-semibold text-gray-700 text-center leading-tight">{name}</span>

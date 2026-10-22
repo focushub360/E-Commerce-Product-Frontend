@@ -56,6 +56,7 @@ export default function Navbar({ auth, cartHook, wishlistHook, notifHook, subPil
     { name: "Transmission & Clutch", slug: "transmission-clutch", navOrder: 4 },
     { name: "Tyres & Wheels", slug: "tyres-wheels", navOrder: 5 },
     { name: "Oils & Lubricants", slug: "oils-lubricants", navOrder: 6 },
+    { name: "Agriculture", slug: "agriculture", navOrder: 7 },
   ]);
 
   const [catsLoading, setCatsLoading] = useState(false);
@@ -115,8 +116,11 @@ export default function Navbar({ auth, cartHook, wishlistHook, notifHook, subPil
       try {
         setCatsLoading(true);
         const { data } = await api.get("/categories?nav=true");
-        if (Array.isArray(data))
-          setCategories([...data].sort((a, b) => (a.navOrder ?? 99) - (b.navOrder ?? 99)));
+        if (Array.isArray(data)) {
+          const hasAgri = data.some(c => c.slug?.toLowerCase() === "agriculture");
+          const merged = hasAgri ? data : [...data, { name: "Agriculture", slug: "agriculture", navOrder: 7 }];
+          setCategories([...merged].sort((a, b) => (a.navOrder ?? 99) - (b.navOrder ?? 99)));
+        }
       } catch (e) {
         console.error("Category fetch error:", e);
       } finally {
@@ -391,7 +395,7 @@ export default function Navbar({ auth, cartHook, wishlistHook, notifHook, subPil
               <form onSubmit={handleSearchSubmit} className="relative w-full">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 <input type="text" value={searchQuery} onChange={handleSearchChange}
-                  placeholder="Search parts, accessories, bike model…"
+                  placeholder="Search parts, equipment, accessories…"
                   className="w-full pl-9 pr-9 py-2.5 border-2 border-gray-200 rounded-xl text-sm
                              focus:outline-none focus:border-[#0a1f44] bg-gray-50 transition-all" />
                 {searchQuery && (
@@ -600,8 +604,12 @@ export default function Navbar({ auth, cartHook, wishlistHook, notifHook, subPil
                         className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold
                           whitespace-nowrap border transition-all select-none
                           ${isActive
-                            ? "bg-[#0a1f44] text-white border-[#0a1f44]"
-                            : "border-gray-200 bg-white text-gray-700 hover:bg-[#0a1f44] hover:text-white hover:border-[#0a1f44]"}`}
+                            ? slug === "agriculture"
+                              ? "bg-[#15803d] text-white border-[#15803d] shadow-sm"
+                              : "bg-[#0a1f44] text-white border-[#0a1f44]"
+                            : slug === "agriculture"
+                              ? "border-emerald-200 bg-emerald-50/50 text-emerald-800 hover:bg-[#15803d] hover:text-white hover:border-[#15803d]"
+                              : "border-gray-200 bg-white text-gray-700 hover:bg-[#0a1f44] hover:text-white hover:border-[#0a1f44]"}`}
                       >
                         {name}
                         {showChevron && (
@@ -613,7 +621,7 @@ export default function Navbar({ auth, cartHook, wishlistHook, notifHook, subPil
                       {isDropdownOpen && (
                         <div className="nav-dd absolute left-0 top-full mt-2 z-[60] bg-white
                                         rounded-2xl shadow-2xl border border-gray-100 overflow-hidden min-w-[210px]">
-                          <div className="px-4 py-2.5 bg-[#0a1f44] flex items-center justify-between">
+                          <div className={`px-4 py-2.5 flex items-center justify-between ${slug === "agriculture" ? "bg-[#15803d]" : "bg-[#0a1f44]"}`}>
                             <p className="text-xs font-black text-white uppercase tracking-wider">{dropdownName}</p>
                             {dropdownLoading && (
                               <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -769,7 +777,7 @@ export default function Navbar({ auth, cartHook, wishlistHook, notifHook, subPil
                     <div className="flex items-center">
                       <button onClick={() => goCategory(slug)}
                         className={`flex-1 text-left py-2.5 text-sm font-medium
-                          ${isActive ? "text-[#0a1f44] font-semibold" : "text-gray-700"}`}>
+                          ${isActive ? (slug === "agriculture" ? "text-[#15803d] font-bold" : "text-[#0a1f44] font-semibold") : "text-gray-700"}`}>
                         {name}
                       </button>
                       {subs.length > 0 && (

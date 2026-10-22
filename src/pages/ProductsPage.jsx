@@ -44,6 +44,7 @@ function useDropdownPortal(open, setOpen, triggerRef, listRef) {
       window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", updateCoords);
     };
+
   }, [open, setOpen, updateCoords, listRef]);
 
   // Close on outside click

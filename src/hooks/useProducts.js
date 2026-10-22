@@ -39,6 +39,11 @@ export const useProducts = () => {
     setLoading(true);
     try {
       const { data } = await api.get(`/products/${id}`);
+
+       console.log("PRODUCT API RESPONSE:", data);
+        console.log("STOCK IN API RESPONSE:", data?.stock);
+
+        
       setProduct(data);
       return data;
     } catch (err) {
@@ -61,6 +66,11 @@ export const useProducts = () => {
       setSearchResults([]);
     }
   }, []);
+      
+
+
+
+
 
   const clearSearch = useCallback(() => setSearchResults([]), []);
 

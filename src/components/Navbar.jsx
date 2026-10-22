@@ -35,6 +35,7 @@ export default function Navbar({ auth, cartHook, wishlistHook, notifHook, subPil
   const [showMoreMenu,      setShowMoreMenu]   = useState(false);
   const [showUserMenu,      setShowUserMenu]   = useState(false);
   const [showNotifPanel,    setShowNotifPanel] = useState(false);
+  const [dealerNotifications, setDealerNotifications] = useState([]);
   const [mobileMenuOpen,    setMobileMenuOpen] = useState(false);
   const [mobileSearchOpen,  setMobileSearchOpen] = useState(false);
   const [categories,        setCategories]     = useState([]);
@@ -68,6 +69,14 @@ export default function Navbar({ auth, cartHook, wishlistHook, notifHook, subPil
   const isAdmin  = user?.role === "admin";
   const isUser   = user?.role === "user";
   const showCartWishlist = isLoggedIn && isUser;
+  
+  const visibleNotifications = isDealer
+  ? dealerNotifications
+  : notifications;
+
+const visibleUnreadCount = visibleNotifications.filter(
+  (notification) => !notification.isRead
+).length;
 
   const activeCatSlug = location.pathname.match(/\/products\/category\/([^/?]+)/)?.[1]?.toLowerCase() || null;
   const activeSubSlug = new URLSearchParams(location.search).get("sub") || null;
@@ -105,6 +114,33 @@ export default function Navbar({ auth, cartHook, wishlistHook, notifHook, subPil
     };
     load();
   }, []);
+
+
+  /* Fetch dealer out-of-stock notifications */
+useEffect(() => {
+  if (!isLoggedIn || user?.role !== "dealer") {
+    setDealerNotifications([]);
+    return;
+  }
+
+  const fetchDealerNotifications = async () => {
+    try {
+      const { data } = await api.get("/dealer-notifications");
+      setDealerNotifications(data.notifications || []);
+    } catch (error) {
+      console.error(
+        "Failed to fetch dealer notifications:",
+        error.response?.data || error.message
+      );
+    }
+  };
+
+  fetchDealerNotifications();
+
+  const interval = setInterval(fetchDealerNotifications, 15000);
+
+  return () => clearInterval(interval);
+}, [isLoggedIn, user?._id, user?.role]);
 
   /* ── Measure header height ── */
   useEffect(() => {
@@ -510,21 +546,34 @@ export default function Navbar({ auth, cartHook, wishlistHook, notifHook, subPil
               </div>
 
               {/* Notification bell — desktop */}
-              {isLoggedIn && (
-                <div className="relative hidden sm:block" ref={notifRef}>
-                  <button onClick={() => setShowNotifPanel(s => !s)}
-                    className="relative p-2.5 rounded-xl hover:bg-gray-100 transition-colors">
-                    <Bell className="w-5 h-5 text-gray-600" />
-                    {unreadCount > 0 && <span className="badge-count">{unreadCount > 9 ? "9+" : unreadCount}</span>}
-                  </button>
-                  {showNotifPanel && (
-                    <NotificationPanel notifications={notifications} unreadCount={unreadCount}
-                      markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif}
-                      onClose={() => setShowNotifPanel(false)} />
-                  )}
-                </div>
-              )}
+             {/* Notification bell — desktop */}
+{isLoggedIn && (
+  <div className="relative hidden sm:block" ref={notifRef}>
+    <button
+      onClick={() => setShowNotifPanel((s) => !s)}
+      className="relative p-2.5 rounded-xl hover:bg-gray-100 transition-colors"
+    >
+      <Bell className="w-5 h-5 text-gray-600" />
 
+      {visibleUnreadCount > 0 && (
+        <span className="badge-count">
+          {visibleUnreadCount > 9 ? "9+" : visibleUnreadCount}
+        </span>
+      )}
+    </button>
+
+    {showNotifPanel && (
+      <NotificationPanel
+        notifications={visibleNotifications}
+        unreadCount={visibleUnreadCount}
+        markRead={markRead}
+        markAllRead={markAllRead}
+        deleteNotif={deleteNotif}
+        onClose={() => setShowNotifPanel(false)}
+      />
+    )}
+  </div>
+)}
               {/* Wishlist — desktop */}
               {showCartWishlist && (
                 <button onClick={goWishlist}
@@ -548,8 +597,8 @@ export default function Navbar({ auth, cartHook, wishlistHook, notifHook, subPil
               className="sm:hidden flex-shrink-0 mr-2 p-2 rounded-xl hover:bg-gray-100 transition-colors relative">
                 <Menu className="w-5 h-5 text-gray-600" />
                 {/* Badge on hamburger = total of cart+wishlist+notif */}
-                {(cartCount + wishlistCount + unreadCount) > 0 && (
-                  <span className="badge-count">{Math.min((cartCount + wishlistCount + unreadCount), 9)}{(cartCount + wishlistCount + unreadCount) > 9 ? "+" : ""}</span>
+                {(cartCount + wishlistCount + visibleUnreadCount) > 0 && (
+                  <span className="badge-count">{Math.min((cartCount + wishlistCount + visibleUnreadCount), 9)}{(cartCount + wishlistCount + visibleUnreadCount) > 9 ? "+" : ""}</span>
                 )}
               </button>
             </div>
@@ -688,11 +737,11 @@ export default function Navbar({ auth, cartHook, wishlistHook, notifHook, subPil
                   className="flex flex-col items-center gap-1 py-3 rounded-xl bg-gray-50 hover:bg-yellow-50 transition-colors relative">
                   <Bell className="w-5 h-5 text-[#0a1f44]" />
                   <span className="text-xs font-semibold text-gray-700">Alerts</span>
-                  {unreadCount > 0 && (
-                    <span className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] bg-[#de1c0e] text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
-                      {unreadCount > 9 ? "9+" : unreadCount}
-                    </span>
-                  )}
+                  {visibleUnreadCount > 0 && (
+  <span className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] bg-[#de1c0e] text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+    {visibleUnreadCount > 9 ? "9+" : visibleUnreadCount}
+  </span>
+)}
                 </button>
               </div>
             )}
@@ -783,9 +832,14 @@ export default function Navbar({ auth, cartHook, wishlistHook, notifHook, subPil
         <div className="sm:hidden fixed inset-0 z-50 bg-black/40" onClick={() => setShowNotifPanel(false)}>
           <div className="absolute right-0 top-0 bottom-0 w-full max-w-sm bg-white shadow-2xl overflow-y-auto"
             onClick={e => e.stopPropagation()}>
-            <NotificationPanel notifications={notifications} unreadCount={unreadCount}
-              markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif}
-              onClose={() => setShowNotifPanel(false)} />
+            <NotificationPanel
+              notifications={visibleNotifications}
+              unreadCount={visibleUnreadCount}
+              markRead={markRead}
+              markAllRead={markAllRead}
+              deleteNotif={deleteNotif}
+              onClose={() => setShowNotifPanel(false)}
+            />
           </div>
         </div>
       )}

@@ -1,5 +1,6 @@
 /* eslint-disable no-unused-vars */
 import { useEffect, useState, useCallback } from "react";
+import { getNotifyStatus, createNotifyMe } from "../services/notifyService";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Star, ShoppingCart, Heart, Truck, Shield, RotateCcw,
@@ -11,6 +12,10 @@ import { useProducts } from "../hooks/useProducts";
 import NearbyAvailability from "../components/fulfillment/NearbyAvailability";
 import api from "../utils/api";
 import toast from "react-hot-toast";
+
+
+
+
 
 /* ════════════════════════════════════════════════════════
    REVIEW SUB-COMPONENTS
@@ -384,6 +389,15 @@ export default function ProductDetailPage({ auth, cartHook, wishlistHook }) {
   const { product, loading, fetchProduct } = useProducts();
   const [qty, setQty] = useState(1);
   const [activeTab, setActiveTab] = useState("specs");
+  const [notifyLoading, setNotifyLoading] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
+
+
+   console.log("Frontend product:", product);
+    console.log("Frontend stock:", product?.stock);
+    console.log("Frontend quantity:", product?.quantity);
+
+   
 
   useEffect(() => {
     if (id) { fetchProduct(id); window.scrollTo(0, 0); }
@@ -413,6 +427,66 @@ export default function ProductDetailPage({ auth, cartHook, wishlistHook }) {
     if (!isLoggedIn) { navigate("/login"); return; }
     inWishlist ? removeFromWishlist?.(product._id) : addToWishlist?.(product._id);
   };
+   const handleNotifyMe = async () => {
+  try {
+    setNotifyLoading(true);
+
+    await createNotifyMe(product._id);
+
+    setIsSubscribed(true);
+    toast.success("You'll be notified when this product is back in stock!");
+   
+  } catch (error) {
+    if (error.response?.status === 409) {
+      setIsSubscribed(true);
+      toast.info("You're already subscribed to this product.");
+    } else if (error.response?.status === 401) {
+      toast.info("Please log in to use Notify Me.");
+      navigate("/login");
+    } else {
+      toast.error(
+        error.response?.data?.message || "Unable to subscribe. Please try again."
+      );
+    }
+  } finally {
+    setNotifyLoading(false);
+  }
+};useEffect(() => {
+    if (!canShop || !product?._id) {
+        setIsSubscribed(false);
+        return;
+    }
+
+    // Product is in stock: reset the subscription UI.
+    if (Number(product.stock) > 0) {
+        setIsSubscribed(false);
+        return;
+    }
+
+    let cancelled = false;
+
+    const checkStatus = async () => {
+        try {
+            const data = await getNotifyStatus(product._id);
+
+            if (!cancelled) {
+                setIsSubscribed(data.subscribed === true);
+            }
+        } catch (error) {
+            console.error(
+                "Failed to check Notify Me status:",
+                error
+            );
+        }
+    };
+
+    checkStatus();
+
+    return () => {
+        cancelled = true;
+    };
+}, [canShop, product?._id, product?.stock]);
+
 
   if (loading || !product)
     return (
@@ -522,39 +596,96 @@ export default function ProductDetailPage({ auth, cartHook, wishlistHook }) {
           {canShop && <NearbyAvailability productId={product._id} quantity={qty} />} 
 
           {/* Action buttons */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            {canShop ? (
-              <>
-                <button onClick={handleCart} disabled={product.stock === 0 || cartLoading}
-                  className="flex-1 btn-primary py-3 text-sm">
-                  <ShoppingCart className="w-4 h-4" />
-                  {product.stock === 0 ? "Out of Stock" : "Add to Cart"}
-                </button>
-                <button onClick={handleBuy} disabled={product.stock === 0}
-                  className="flex-1 inline-flex items-center justify-center gap-2
-                             bg-red-700 hover:bg-red-600 disabled:bg-gray-200
-                             text-white font-semibold py-3 rounded-xl
-                             transition-colors text-sm active:scale-95">
-                  <Package className="w-4 h-4" /> Buy Now
-                </button>
-                {/* Wishlist */}
-                <button onClick={handleWish}
-                  className={`p-3 rounded-xl border-2 transition-all
-                    ${inWishlist ? "border-red-400 bg-red-50 text-red-500" : "border-gray-200 text-gray-400 hover:border-red-300"}`}>
-                  <Heart className={`w-5 h-5 ${inWishlist ? "fill-current" : ""}`} />
-                </button>
-              </>
-            ) : (
-              /* Dealer / Admin — view only */
-              <div className="flex-1 flex items-center gap-2 bg-blue-50 border border-blue-100
-                              rounded-xl px-4 py-3 text-sm text-[#0a1f44] font-semibold">
-                <Package className="w-4 h-4 flex-shrink-0" />
-                <span>
-                  {user?.role === "dealer" ? "Dealer account — browse only" : "Admin account — browse only"}
-                </span>
-              </div>
-            )}
-          </div>
+{/* Action buttons */}
+<div className="flex flex-col sm:flex-row gap-3">
+  {canShop ? (
+    <>
+      {Number(product.stock) > 0 ? (
+        <>
+          {/* Show only when the product is in stock */}
+          <button
+            type="button"
+            onClick={handleCart}
+            disabled={cartLoading}
+            className="flex-1 btn-primary py-3 text-sm"
+          >
+            <ShoppingCart className="w-4 h-4" />
+            Add to Cart
+          </button>
+
+          <button
+            type="button"
+            onClick={handleBuy}
+            className="flex-1 inline-flex items-center justify-center gap-2
+                       bg-red-700 hover:bg-red-600
+                       text-white font-semibold py-3 rounded-xl
+                       transition-colors text-sm active:scale-95"
+          >
+            <Package className="w-4 h-4" />
+            Buy Now
+          </button>
+        </>
+      ) : (
+        /* Show Notify Me when the product is out of stock */
+        <button
+          type="button"
+          onClick={handleNotifyMe}
+          disabled={notifyLoading || isSubscribed}
+          className="flex-1 inline-flex items-center justify-center gap-2
+                     bg-[#0a1f44] hover:bg-blue-900
+                     disabled:bg-gray-400 disabled:cursor-not-allowed
+                     text-white font-semibold py-3 rounded-xl
+                     transition-colors text-sm"
+        >
+          {notifyLoading ? (
+            "Please wait..."
+          ) : isSubscribed ? (
+            <>
+              <CheckCircle className="w-4 h-4" />
+              Subscribed
+            </>
+          ) : (
+            <>
+              <Package className="w-4 h-4" />
+              Notify Me When Available
+            </>
+          )}
+        </button>
+      )}
+
+      {/* Wishlist remains visible */}
+      <button
+        type="button"
+        onClick={handleWish}
+        className={`p-3 rounded-xl border-2 transition-all ${
+          inWishlist
+            ? "border-red-400 bg-red-50 text-red-500"
+            : "border-gray-200 text-gray-400 hover:border-red-300"
+        }`}
+      >
+        <Heart
+          className={`w-5 h-5 ${
+            inWishlist ? "fill-current" : ""
+          }`}
+        />
+      </button>
+    </>
+  ) : (
+    /* Dealer / Admin — view only */
+    <div
+      className="flex-1 flex items-center gap-2 bg-blue-50 border border-blue-100
+                 rounded-xl px-4 py-3 text-sm text-[#0a1f44] font-semibold"
+    >
+      <Package className="w-4 h-4 flex-shrink-0" />
+
+      <span>
+        {user?.role === "dealer"
+          ? "Dealer account — browse only"
+          : "Admin account — browse only"}
+      </span>
+    </div>
+  )}
+</div>
 
           {/* Perks */}
           <div className="grid grid-cols-3 gap-2 pt-3 border-t border-gray-100">
@@ -581,7 +712,7 @@ export default function ProductDetailPage({ auth, cartHook, wishlistHook }) {
               className={`px-6 py-4 text-sm font-semibold capitalize transition-colors
                 ${activeTab === tab ? "text-[#0a1f44] border-b-2 border-[#0a1f44] bg-blue-50/30" : "text-gray-500 hover:text-gray-700"}`}>
               {tab === "specs" ? "Specifications" : "Description"}
-            </button>
+          </button>
           ))}
         </div>
         <div className="p-6">

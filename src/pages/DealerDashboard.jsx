@@ -75,7 +75,7 @@ function loadCategories() {
   _catPromise = api
     .get("/categories")
     .then(({ data }) => {
-      _catCache =
+      _catCache =+
         Array.isArray(data) && data.length > 0
           ? mergeCategories(DEFAULT_CATEGORIES, data)
           : DEFAULT_CATEGORIES;

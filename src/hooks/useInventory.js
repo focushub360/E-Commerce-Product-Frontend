@@ -89,9 +89,12 @@ export function useInventory({ scope = 'all', active = true } = {}) {
 
   const updateStock = useCallback(
     async (id, payload) => {
+
+      console.log('FRONTEND STOCK PAYLOAD:', { id, payload });
       setSaving(true);
       try {
-        await updateInventoryItem(id, payload);
+         const result =await updateInventoryItem(id, payload);
+        console.log('BACKEND STOCK RESPONSE:', result);
         toast.success('Inventory updated');
         await fetchInventory();
         return { ok: true };
